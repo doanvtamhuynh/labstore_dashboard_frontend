@@ -123,9 +123,19 @@ function Field({ label, value, onChange, type = 'text' }) {
 
 function Shell() {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [dark, setDark] = useState(false)
   const navigate = useNavigate()
   const user = tokenStore.getUser()
+  const sidebarLinks = (
+    <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-3">
+      {nav.map(([label, to, Icon]) => (
+        <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm ${isActive ? 'bg-teal-50 text-brand dark:bg-teal-950' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}>
+          <Icon size={18} /> {!collapsed && label}
+        </NavLink>
+      ))}
+    </nav>
+  )
   return (
     <div className={dark ? 'dark' : ''}>
       <div className="flex min-h-screen bg-slate-100 text-ink dark:bg-zinc-950 dark:text-zinc-100">
@@ -134,17 +144,23 @@ function Shell() {
             <div className="flex items-center gap-3 font-semibold"><Boxes className="text-brand" /> {!collapsed && 'Labstore'}</div>
             <button onClick={() => setCollapsed(!collapsed)} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-zinc-800"><ChevronLeft className={collapsed ? 'rotate-180' : ''} size={18} /></button>
           </div>
-          <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-3">
-            {nav.map(([label, to, Icon]) => (
-              <NavLink key={to} to={to} className={({ isActive }) => `mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm ${isActive ? 'bg-teal-50 text-brand dark:bg-teal-950' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}>
-                <Icon size={18} /> {!collapsed && label}
-              </NavLink>
-            ))}
-          </nav>
+          {sidebarLinks}
         </aside>
+        {mobileOpen && (
+          <div className="fixed inset-0 z-30 lg:hidden">
+            <button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/40" onClick={() => setMobileOpen(false)} />
+            <aside className="relative h-full w-80 max-w-[86vw] border-r border-line bg-white dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="flex h-16 items-center justify-between border-b border-line px-4 dark:border-zinc-800">
+                <div className="flex items-center gap-3 font-semibold"><Boxes className="text-brand" /> Labstore</div>
+                <button onClick={() => setMobileOpen(false)} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-zinc-800"><ChevronLeft size={18} /></button>
+              </div>
+              {sidebarLinks}
+            </aside>
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-line bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="flex items-center gap-3"><Menu className="lg:hidden" /><Search size={18} /><span className="text-sm text-slate-500">Search operations</span></div>
+            <div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 lg:hidden"><Menu size={18} /></button><Search size={18} /><span className="text-sm text-slate-500">Search operations</span></div>
             <div className="flex items-center gap-2">
               <button onClick={() => setDark(!dark)} className="rounded-md border border-line p-2 dark:border-zinc-700">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
               <span className="hidden text-sm sm:inline">{user?.fullName || user?.email}</span>
@@ -201,12 +217,54 @@ function Dashboard() {
 function ResourcePage({ config }) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [editor, setEditor] = useState(() => JSON.stringify(config.sample || {}, null, 2))
   const [selected, setSelected] = useState(null)
   const query = useQuery({ queryKey: [config.endpoint], queryFn: () => api.get(config.endpoint).then((r) => pickRows(r.data)) })
-  const rows = useMemo(() => (query.data || []).filter((row) => JSON.stringify(row).toLowerCase().includes(search.toLowerCase())), [query.data, search])
+  const rows = useMemo(() => (query.data || [])
+    .filter((row) => JSON.stringify(row).toLowerCase().includes(search.toLowerCase()))
+    .filter((row) => !statusFilter || row.status === statusFilter || row.paymentStatus === statusFilter), [query.data, search, statusFilter])
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const visibleRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const statusOptions = useMemo(() => [...new Set((query.data || []).flatMap((row) => [row.status, row.paymentStatus]).filter(Boolean))], [query.data])
   const canMutate = Boolean(config.sample)
   const canProductManage = config.endpoint === '/products'
+  async function exportCsv() {
+    const exportEndpoints = {
+      '/products': '/products/export',
+      '/orders': '/orders/export',
+      '/reports': '/reports/revenue/export',
+    }
+    const endpoint = exportEndpoints[config.endpoint]
+    if (!endpoint) {
+      toast.info('Export is not available for this page yet')
+      return
+    }
+    const response = await api.get(endpoint, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${config.title.toLowerCase().replaceAll(' ', '-')}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  async function importProducts(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      await api.post('/products/import', formData)
+      toast.success('Products imported')
+      query.refetch()
+    } catch {
+      toast.error('Import failed')
+    } finally {
+      event.target.value = ''
+    }
+  }
   async function save() {
     try {
       const payload = JSON.parse(editor)
@@ -265,11 +323,24 @@ function ResourcePage({ config }) {
       <PageTitle title={config.title} action="Export" />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="min-w-72 rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" />
+        {statusOptions.length > 0 && <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }} className="rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"><option value="">All statuses</option>{statusOptions.map((status) => <option key={status}>{status}</option>)}</select>}
+        <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }} className="rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"><option value={10}>10 rows</option><option value={20}>20 rows</option><option value={50}>50 rows</option></select>
         {config.create && <NavLink to={config.create} className="rounded-md bg-brand px-4 py-2 text-white">Create</NavLink>}
+        {(config.endpoint === '/products' || config.endpoint === '/orders') && <button onClick={exportCsv} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Export CSV</button>}
+        {config.endpoint === '/products' && <label className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Import CSV<input type="file" accept=".csv" onChange={importProducts} className="hidden" /></label>}
         {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
-        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canProductManage || canMutate ? remove : null} /></Panel>
+        <Panel title={`${rows.length} records`}>
+          <DataTable rows={visibleRows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canProductManage || canMutate ? remove : null} />
+          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm dark:border-zinc-800">
+            <span className="text-slate-500">Page {page} of {totalPages}</span>
+            <div className="flex gap-2">
+              <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-md border border-line px-3 py-1 disabled:opacity-50 dark:border-zinc-700">Prev</button>
+              <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="rounded-md border border-line px-3 py-1 disabled:opacity-50 dark:border-zinc-700">Next</button>
+            </div>
+          </div>
+        </Panel>
         {canMutate && (
           <Panel title={selected ? `Edit ${selected.id}` : 'Create JSON'}>
             <textarea value={editor} onChange={(event) => setEditor(event.target.value)} className="h-80 w-full rounded-md border border-line bg-slate-50 p-3 font-mono text-xs outline-none focus:border-brand dark:border-zinc-700 dark:bg-zinc-950" />

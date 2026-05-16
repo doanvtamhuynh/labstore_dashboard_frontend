@@ -57,5 +57,8 @@
   - Settings page now edits store/general settings and triggers backup.
   - Products table now supports edit navigation and delete action.
   - Admins page includes JSON create/edit payload with role and initial password for create.
+  - Resource tables now include client-side pagination, rows-per-page selector, and status/payment status filter.
+  - Mobile sidebar overlay is implemented for tablet/mobile navigation.
+  - Products page supports CSV import and CSV export; Orders page supports CSV export.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
