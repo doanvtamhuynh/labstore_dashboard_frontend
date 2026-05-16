@@ -50,5 +50,8 @@
   - Product create/edit form now calls POST/PUT /api/products with inventory, status, description, and SEO fields.
   - Order detail connects GET /api/orders/{id}, PATCH /api/orders/{id}/status, history table, and invoice PDF link.
   - Customer detail connects GET /api/customers/{id}, segment update, loyalty update, CRM notes, and purchase history.
+  - Payments page supports refund action via POST /api/payments/{id}/refund.
+  - Reviews page supports approve, hide, and reply actions.
+  - Notifications page supports mark-as-read action.
   - Lint verified with npm run lint.
   - Build verified with npm run build.

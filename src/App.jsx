@@ -233,6 +233,32 @@ function ResourcePage({ config }) {
       toast.error('Delete failed')
     }
   }
+  async function runRowAction(row, action) {
+    try {
+      if (action === 'refund') {
+        const amount = Number(window.prompt('Refund amount', row.amount - (row.refundedAmount || 0)))
+        if (!amount) return
+        await api.post(`/payments/${row.id}/refund`, { amount, reason: 'Dashboard refund' })
+      }
+      if (action === 'approve-review') await api.patch(`/reviews/${row.id}/status`, { status: 'Approved' })
+      if (action === 'hide-review') await api.patch(`/reviews/${row.id}/status`, { status: 'Hidden' })
+      if (action === 'reply-review') {
+        const reply = window.prompt('Reply')
+        if (!reply) return
+        await api.post(`/reviews/${row.id}/reply`, { reply })
+      }
+      if (action === 'read-notification') await api.patch(`/notifications/${row.id}/read`)
+      toast.success('Action completed')
+      query.refetch()
+    } catch {
+      toast.error('Action failed')
+    }
+  }
+  const rowActions = {
+    '/payments': [{ label: 'Refund', action: 'refund' }],
+    '/reviews': [{ label: 'Approve', action: 'approve-review' }, { label: 'Hide', action: 'hide-review' }, { label: 'Reply', action: 'reply-review' }],
+    '/notifications': [{ label: 'Read', action: 'read-notification' }],
+  }[config.endpoint] || []
   return (
     <section>
       <PageTitle title={config.title} action="Export" />
@@ -242,7 +268,7 @@ function ResourcePage({ config }) {
         {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
-        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
+        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
         {canMutate && (
           <Panel title={selected ? `Edit ${selected.id}` : 'Create JSON'}>
             <textarea value={editor} onChange={(event) => setEditor(event.target.value)} className="h-80 w-full rounded-md border border-line bg-slate-50 p-3 font-mono text-xs outline-none focus:border-brand dark:border-zinc-700 dark:bg-zinc-950" />
@@ -257,14 +283,14 @@ function ResourcePage({ config }) {
   )
 }
 
-function DataTable({ rows, columns, loading, onView, onEdit, onDelete }) {
+function DataTable({ rows, columns, loading, rowActions = [], onView, onEdit, onDelete }) {
   if (loading) return <div className="h-32 animate-pulse rounded-md bg-slate-100 dark:bg-zinc-800" />
   if (!rows.length) return <div className="py-10 text-center text-slate-500">No records found</div>
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(onView || onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(onView || onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onView && <button onClick={() => onView(row)} className="mr-2 text-slate-600 dark:text-zinc-300">View</button>}{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
+        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onView && <button onClick={() => onView(row)} className="mr-2 text-slate-600 dark:text-zinc-300">View</button>}{rowActions.map((item) => <button key={item.action} onClick={() => item.run(row, item.action)} className="mr-2 text-brand">{item.label}</button>)}{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
       </table>
     </div>
   )
