@@ -1,16 +1,18 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import * as signalR from '@microsoft/signalr'
 import {
   Bell, Boxes, ChartNoAxesCombined, ChevronLeft, ClipboardList, CreditCard, FileText,
   LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck,
   Star, Sun, Tags, Truck, Users, MessageSquare, Globe2,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, login, tokenStore } from './services/api'
 
 const queryClient = new QueryClient()
+const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace('/api', '')
 
 const nav = [
   ['Dashboard', '/dashboard', LayoutDashboard],
@@ -124,9 +126,24 @@ function Field({ label, value, onChange, type = 'text' }) {
 function Shell() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [notifyOpen, setNotifyOpen] = useState(false)
+  const [liveNotifications, setLiveNotifications] = useState([])
   const [dark, setDark] = useState(false)
   const navigate = useNavigate()
   const user = tokenStore.getUser()
+  const notifications = useQuery({ queryKey: ['header-notifications'], queryFn: () => api.get('/notifications').then((r) => pickRows(r.data)), refetchInterval: 60000 })
+  useEffect(() => {
+    const connection = new signalR.HubConnectionBuilder().withUrl(`${API_ORIGIN}/hubs/notifications`).withAutomaticReconnect().build()
+    connection.on('notificationReceived', (message) => {
+      setLiveNotifications((items) => [message, ...items].slice(0, 5))
+      toast.info(message.title)
+      queryClient.invalidateQueries({ queryKey: ['header-notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['/notifications'] })
+    })
+    connection.start().then(() => connection.invoke('JoinAdminChannel')).catch(() => {})
+    return () => { connection.stop() }
+  }, [])
+  const unread = [...liveNotifications, ...(notifications.data || [])].filter((item) => !item.isRead).length
   const sidebarLinks = (
     <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-3">
       {nav.map(([label, to, Icon]) => (
@@ -163,6 +180,24 @@ function Shell() {
             <div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 lg:hidden"><Menu size={18} /></button><Search size={18} /><span className="text-sm text-slate-500">Search operations</span></div>
             <div className="flex items-center gap-2">
               <button onClick={() => setDark(!dark)} className="rounded-md border border-line p-2 dark:border-zinc-700">{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
+              <div className="relative">
+                <button onClick={() => setNotifyOpen(!notifyOpen)} className="relative rounded-md border border-line p-2 dark:border-zinc-700">
+                  <Bell size={18} />
+                  {unread > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-berry px-1 text-[10px] text-white">{unread}</span>}
+                </button>
+                {notifyOpen && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-md border border-line bg-white p-3 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="mb-2 text-sm font-semibold">Notifications</div>
+                    {[...liveNotifications, ...(notifications.data || [])].slice(0, 6).map((item, index) => (
+                      <div key={item.id || index} className="border-t border-line py-2 text-sm first:border-t-0 dark:border-zinc-800">
+                        <div className="font-medium">{item.title}</div>
+                        <div className="text-slate-500">{item.message}</div>
+                      </div>
+                    ))}
+                    <NavLink to="/notifications" onClick={() => setNotifyOpen(false)} className="mt-2 block rounded-md bg-slate-100 px-3 py-2 text-center text-sm dark:bg-zinc-800">View all</NavLink>
+                  </div>
+                )}
+              </div>
               <span className="hidden text-sm sm:inline">{user?.fullName || user?.email}</span>
               <button onClick={() => { tokenStore.clear(); navigate('/login') }} className="rounded-md border border-line p-2 text-berry dark:border-zinc-700"><LogOut size={18} /></button>
             </div>
@@ -543,12 +578,50 @@ function CustomerDetail() {
   )
 }
 
-function Detail({ title, description = 'Operational detail view connected to the protected dashboard shell.' }) {
-  return <Panel title={title}><p className="text-slate-600 dark:text-zinc-400">{description}</p></Panel>
-}
-
 function LiveChat() {
-  return <Detail title="Live Chat" description="Realtime ticket chat connects to SignalR hub /hubs/chat." />
+  const [ticketId, setTicketId] = useState('')
+  const [sender, setSender] = useState(tokenStore.getUser()?.email || 'admin')
+  const [message, setMessage] = useState('')
+  const [messages, setMessages] = useState([])
+  const [connection, setConnection] = useState(null)
+  useEffect(() => {
+    const next = new signalR.HubConnectionBuilder().withUrl(`${API_ORIGIN}/hubs/chat`).withAutomaticReconnect().build()
+    next.on('ticketMessageReceived', (payload) => setMessages((items) => [payload, ...items].slice(0, 30)))
+    next.start().then(() => setConnection(next)).catch(() => {})
+    return () => { next.stop() }
+  }, [])
+  async function join() {
+    if (!ticketId || !connection) return
+    await connection.invoke('JoinTicket', ticketId)
+    toast.success('Joined ticket chat')
+  }
+  async function send() {
+    if (!ticketId || !message || !connection) return
+    await connection.invoke('SendTicketMessage', ticketId, sender, message)
+    setMessage('')
+  }
+  return (
+    <section>
+      <PageTitle title="Live Chat" action={connection ? 'Connected' : 'Connecting'} />
+      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+        <Panel title="Ticket Channel">
+          <FormInput label="Ticket ID" value={ticketId} onChange={setTicketId} />
+          <FormInput label="Sender" value={sender} onChange={setSender} />
+          <button onClick={join} className="mt-3 w-full rounded-md bg-brand px-4 py-2 text-white">Join Ticket</button>
+          <textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Message" className="mt-3 h-28 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+          <button onClick={send} className="mt-3 w-full rounded-md border border-line px-4 py-2 dark:border-zinc-700">Send</button>
+        </Panel>
+        <Panel title="Messages">
+          {messages.length === 0 ? <div className="py-10 text-center text-slate-500">No live messages yet</div> : messages.map((item, index) => (
+            <div key={index} className="border-b border-line py-3 last:border-0 dark:border-zinc-800">
+              <div className="text-sm font-medium">{item.sender}</div>
+              <div className="text-sm text-slate-600 dark:text-zinc-300">{item.message}</div>
+            </div>
+          ))}
+        </Panel>
+      </div>
+    </section>
+  )
 }
 
 function Reports() {

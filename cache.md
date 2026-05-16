@@ -60,5 +60,7 @@
   - Resource tables now include client-side pagination, rows-per-page selector, and status/payment status filter.
   - Mobile sidebar overlay is implemented for tablet/mobile navigation.
   - Products page supports CSV import and CSV export; Orders page supports CSV export.
+  - Header notification bell connects to SignalR /hubs/notifications with unread badge and dropdown.
+  - Live chat page connects to SignalR /hubs/chat, joins ticket channels, and sends ticket messages.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
