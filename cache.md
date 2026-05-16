@@ -63,11 +63,14 @@
   - Header notification bell connects to SignalR /hubs/notifications with unread badge and dropdown.
   - Live chat page connects to SignalR /hubs/chat, joins ticket channels, and sends ticket messages.
   - Sidebar navigation hides SuperAdmin-only Admins/Audit Log links for non-SuperAdmin users.
-  - Settings security panel connects change password and enable 2FA endpoints.
+  - Settings security panel connects change password only; 2FA is intentionally disabled in the frontend.
   - Sidebar collapsed state and theme preference persist in localStorage.
   - CRUD-capable tables support checkbox selection and bulk delete with confirmation dialog.
   - Vite build splits React, charts, query, realtime, and vendor chunks to avoid oversized bundle warnings.
   - Product form supports variants and image URL preview/editing in addition to base information and SEO.
   - Orders, customers, and support tickets tables include quick operational actions for status, lock/unlock, assignment, and ticket status.
+  - 2FA UI was removed from login, settings security panel, and admins table per product decision.
+  - Frontend code was split from a single App.jsx into React-standard folders: components, config, layouts, pages, utils.
+  - Categories now use a dedicated tree management page at /categories with create/edit/delete, parent selection, active toggle, and sort order.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
