@@ -55,5 +55,7 @@
   - Notifications page supports mark-as-read action.
   - Reports page now connects revenue, products, inventory, customers, and affiliate report endpoints.
   - Settings page now edits store/general settings and triggers backup.
+  - Products table now supports edit navigation and delete action.
+  - Admins page includes JSON create/edit payload with role and initial password for create.
   - Lint verified with npm run lint.
   - Build verified with npm run build.

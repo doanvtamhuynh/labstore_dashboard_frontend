@@ -56,7 +56,7 @@ const resourceMap = {
   '/notifications': { title: 'Notifications', endpoint: '/notifications', columns: ['title', 'audience', 'recipientId', 'isRead'], createEndpoint: '/notifications/push', sample: { title: 'Notice', message: 'Message', audience: 'Admin', recipientId: null } },
   '/seo': { title: 'SEO Meta', endpoint: '/seo/meta', columns: ['entityType', 'entityId', 'metaTitle', 'slug'], sample: { entityType: 'page', entityId: 'home', metaTitle: 'Home', metaDescription: 'Homepage', slug: 'home' } },
   '/blog': { title: 'Blog Posts', endpoint: '/blog/posts', columns: ['title', 'slug', 'status'], sample: { title: 'New post', slug: 'new-post', content: '<p>Content</p>', status: 'Draft' } },
-  '/settings/admins': { title: 'Admins', endpoint: '/settings/admins', columns: ['email', 'fullName', 'role', 'isTwoFactorEnabled'] },
+  '/settings/admins': { title: 'Admins', endpoint: '/settings/admins', columns: ['email', 'fullName', 'role', 'isTwoFactorEnabled'], sample: { email: 'staff@labstore.local', fullName: 'Staff Admin', password: 'Admin@123456', role: 'Staff', isActive: true } },
   '/settings/audit-log': { title: 'Audit Log', endpoint: '/settings/audit-log', columns: ['adminUserId', 'action', 'ipAddress', 'createdAtUtc'] },
 }
 
@@ -206,6 +206,7 @@ function ResourcePage({ config }) {
   const query = useQuery({ queryKey: [config.endpoint], queryFn: () => api.get(config.endpoint).then((r) => pickRows(r.data)) })
   const rows = useMemo(() => (query.data || []).filter((row) => JSON.stringify(row).toLowerCase().includes(search.toLowerCase())), [query.data, search])
   const canMutate = Boolean(config.sample)
+  const canProductManage = config.endpoint === '/products'
   async function save() {
     try {
       const payload = JSON.parse(editor)
@@ -268,7 +269,7 @@ function ResourcePage({ config }) {
         {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
-        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
+        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canProductManage || canMutate ? remove : null} /></Panel>
         {canMutate && (
           <Panel title={selected ? `Edit ${selected.id}` : 'Create JSON'}>
             <textarea value={editor} onChange={(event) => setEditor(event.target.value)} className="h-80 w-full rounded-md border border-line bg-slate-50 p-3 font-mono text-xs outline-none focus:border-brand dark:border-zinc-700 dark:bg-zinc-950" />
