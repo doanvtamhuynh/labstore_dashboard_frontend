@@ -40,22 +40,22 @@ const nav = [
 
 const resourceMap = {
   '/products': { title: 'Products', endpoint: '/products', create: '/products/create', columns: ['name', 'sku', 'price', 'stock', 'status'] },
-  '/categories': { title: 'Categories', endpoint: '/categories', columns: ['name', 'slug', 'isActive', 'sortOrder'] },
+  '/categories': { title: 'Categories', endpoint: '/categories', columns: ['name', 'slug', 'isActive', 'sortOrder'], sample: { name: 'New category', slug: 'new-category', parentId: null, imageUrl: '', sortOrder: 0, isActive: true } },
   '/orders': { title: 'Orders', endpoint: '/orders', columns: ['code', 'customerName', 'status', 'paymentStatus', 'totalAmount'] },
   '/customers': { title: 'Customers', endpoint: '/customers', columns: ['fullName', 'email', 'status', 'segment', 'loyaltyPoints'] },
-  '/promotions/coupons': { title: 'Coupons', endpoint: '/promotions/coupons', columns: ['code', 'discountType', 'discountValue', 'usageLimit', 'status'] },
-  '/promotions/flash-sales': { title: 'Flash Sales', endpoint: '/promotions/flash-sales', columns: ['name', 'categoryId', 'discountPercent', 'status'] },
-  '/promotions/banners': { title: 'Banners', endpoint: '/promotions/banners', columns: ['title', 'position', 'status'] },
-  '/promotions/affiliate': { title: 'Affiliate', endpoint: '/promotions/affiliate', columns: ['partnerName', 'trackingCode', 'commissionPercent', 'status'] },
+  '/promotions/coupons': { title: 'Coupons', endpoint: '/promotions/coupons', columns: ['code', 'discountType', 'discountValue', 'usageLimit', 'status'], sample: { code: 'SALE10', discountType: 'Percentage', discountValue: 10, usageLimit: 100, status: 'Active', startsAtUtc: null, endsAtUtc: null } },
+  '/promotions/flash-sales': { title: 'Flash Sales', endpoint: '/promotions/flash-sales', columns: ['name', 'categoryId', 'discountPercent', 'status'], sample: { name: 'Weekend sale', categoryId: null, discountPercent: 15, status: 'Draft', startsAtUtc: new Date().toISOString(), endsAtUtc: new Date(Date.now() + 86400000).toISOString() } },
+  '/promotions/banners': { title: 'Banners', endpoint: '/promotions/banners', columns: ['title', 'position', 'status'], sample: { title: 'Homepage banner', imageUrl: 'https://example.com/banner.jpg', linkUrl: '/', position: 'homepage', status: 'Draft', startsAtUtc: null, endsAtUtc: null } },
+  '/promotions/affiliate': { title: 'Affiliate', endpoint: '/promotions/affiliate', columns: ['partnerName', 'trackingCode', 'commissionPercent', 'status'], sample: { partnerName: 'Partner', trackingCode: 'PARTNER01', commissionPercent: 5, status: 'Active' } },
   '/payments': { title: 'Payments', endpoint: '/payments', columns: ['transactionCode', 'method', 'status', 'amount', 'refundedAmount'] },
-  '/shipping': { title: 'Shipping Configs', endpoint: '/shipping/configs', columns: ['region', 'minWeightKg', 'maxWeightKg', 'fee', 'isActive'] },
-  '/shipping/returns': { title: 'Returns', endpoint: '/shipping/returns', columns: ['orderId', 'customerId', 'reason', 'status'] },
+  '/shipping': { title: 'Shipping Configs', endpoint: '/shipping/configs', columns: ['region', 'minWeightKg', 'maxWeightKg', 'fee', 'isActive'], sample: { region: 'Ho Chi Minh', minWeightKg: 0, maxWeightKg: 5, fee: 30000, isActive: true } },
+  '/shipping/returns': { title: 'Returns', endpoint: '/shipping/returns', columns: ['orderId', 'customerId', 'reason', 'status'], sample: { orderId: '', customerId: '', reason: 'Customer request', status: 'Requested', resolutionNote: '' } },
   '/reviews': { title: 'Reviews', endpoint: '/reviews', columns: ['productId', 'customerName', 'rating', 'status', 'isFlagged'] },
-  '/support/tickets': { title: 'Tickets', endpoint: '/support/tickets', columns: ['subject', 'customerEmail', 'status', 'priority', 'assignedTo'] },
-  '/support/faq': { title: 'FAQ', endpoint: '/support/faq', columns: ['question', 'category', 'isPublished', 'sortOrder'] },
-  '/notifications': { title: 'Notifications', endpoint: '/notifications', columns: ['title', 'audience', 'recipientId', 'isRead'] },
-  '/seo': { title: 'SEO Meta', endpoint: '/seo/meta', columns: ['entityType', 'entityId', 'metaTitle', 'slug'] },
-  '/blog': { title: 'Blog Posts', endpoint: '/blog/posts', columns: ['title', 'slug', 'status'] },
+  '/support/tickets': { title: 'Tickets', endpoint: '/support/tickets', columns: ['subject', 'customerEmail', 'status', 'priority', 'assignedTo'], sample: { subject: 'Need help', customerId: '', customerEmail: 'customer@example.com', priority: 'Medium', message: 'Describe the issue' } },
+  '/support/faq': { title: 'FAQ', endpoint: '/support/faq', columns: ['question', 'category', 'isPublished', 'sortOrder'], sample: { question: 'Question', answer: 'Answer', category: 'General', isPublished: true, sortOrder: 0 } },
+  '/notifications': { title: 'Notifications', endpoint: '/notifications', columns: ['title', 'audience', 'recipientId', 'isRead'], createEndpoint: '/notifications/push', sample: { title: 'Notice', message: 'Message', audience: 'Admin', recipientId: null } },
+  '/seo': { title: 'SEO Meta', endpoint: '/seo/meta', columns: ['entityType', 'entityId', 'metaTitle', 'slug'], sample: { entityType: 'page', entityId: 'home', metaTitle: 'Home', metaDescription: 'Homepage', slug: 'home' } },
+  '/blog': { title: 'Blog Posts', endpoint: '/blog/posts', columns: ['title', 'slug', 'status'], sample: { title: 'New post', slug: 'new-post', content: '<p>Content</p>', status: 'Draft' } },
   '/settings/admins': { title: 'Admins', endpoint: '/settings/admins', columns: ['email', 'fullName', 'role', 'isTwoFactorEnabled'] },
   '/settings/audit-log': { title: 'Audit Log', endpoint: '/settings/audit-log', columns: ['adminUserId', 'action', 'ipAddress', 'createdAtUtc'] },
 }
@@ -200,28 +200,70 @@ function Dashboard() {
 
 function ResourcePage({ config }) {
   const [search, setSearch] = useState('')
+  const [editor, setEditor] = useState(() => JSON.stringify(config.sample || {}, null, 2))
+  const [selected, setSelected] = useState(null)
   const query = useQuery({ queryKey: [config.endpoint], queryFn: () => api.get(config.endpoint).then((r) => pickRows(r.data)) })
   const rows = useMemo(() => (query.data || []).filter((row) => JSON.stringify(row).toLowerCase().includes(search.toLowerCase())), [query.data, search])
+  const canMutate = Boolean(config.sample)
+  async function save() {
+    try {
+      const payload = JSON.parse(editor)
+      if (selected?.id) {
+        await api.put(`${config.endpoint}/${selected.id}`, payload)
+        toast.success('Updated')
+      } else {
+        await api.post(config.createEndpoint || config.endpoint, payload)
+        toast.success('Created')
+      }
+      setSelected(null)
+      setEditor(JSON.stringify(config.sample || {}, null, 2))
+      query.refetch()
+    } catch {
+      toast.error('Invalid JSON or request failed')
+    }
+  }
+  async function remove(row) {
+    if (!row?.id) return
+    try {
+      await api.delete(`${config.endpoint}/${row.id}`)
+      toast.success('Deleted')
+      query.refetch()
+    } catch {
+      toast.error('Delete failed')
+    }
+  }
   return (
     <section>
       <PageTitle title={config.title} action="Export" />
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="min-w-72 rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900" />
         {config.create && <NavLink to={config.create} className="rounded-md bg-brand px-4 py-2 text-white">Create</NavLink>}
+        {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
       </div>
-      <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} /></Panel>
+      <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
+        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
+        {canMutate && (
+          <Panel title={selected ? `Edit ${selected.id}` : 'Create JSON'}>
+            <textarea value={editor} onChange={(event) => setEditor(event.target.value)} className="h-80 w-full rounded-md border border-line bg-slate-50 p-3 font-mono text-xs outline-none focus:border-brand dark:border-zinc-700 dark:bg-zinc-950" />
+            <div className="mt-3 flex gap-2">
+              <button onClick={save} className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white">Save</button>
+              <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 text-sm dark:border-zinc-700">Reset</button>
+            </div>
+          </Panel>
+        )}
+      </div>
     </section>
   )
 }
 
-function DataTable({ rows, columns, loading }) {
+function DataTable({ rows, columns, loading, onEdit, onDelete }) {
   if (loading) return <div className="h-32 animate-pulse rounded-md bg-slate-100 dark:bg-zinc-800" />
   if (!rows.length) return <div className="py-10 text-center text-slate-500">No records found</div>
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}</tr>)}</tbody>
+        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
       </table>
     </div>
   )

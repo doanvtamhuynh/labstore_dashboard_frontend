@@ -46,4 +46,5 @@
   - Protected route guard redirects unauthenticated users to /login.
   - Axios client attaches JWT and refreshes access token on 401.
   - Main layout includes sidebar, header, dark/light toggle, logout, dashboard charts, resource tables, loading and empty states.
+  - CRUD-capable resource pages include reusable JSON create/edit/delete panel for categories, promotions, shipping, support, notifications, SEO, and blog modules.
   - Build verified with npm run build.
