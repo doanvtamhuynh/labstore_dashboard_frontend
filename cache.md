@@ -53,5 +53,7 @@
   - Payments page supports refund action via POST /api/payments/{id}/refund.
   - Reviews page supports approve, hide, and reply actions.
   - Notifications page supports mark-as-read action.
+  - Reports page now connects revenue, products, inventory, customers, and affiliate report endpoints.
+  - Settings page now edits store/general settings and triggers backup.
   - Lint verified with npm run lint.
   - Build verified with npm run build.

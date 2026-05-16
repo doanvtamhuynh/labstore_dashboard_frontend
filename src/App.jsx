@@ -480,13 +480,81 @@ function LiveChat() {
 }
 
 function Reports() {
-  const report = useQuery({ queryKey: ['reports-revenue'], queryFn: () => api.get('/reports/revenue').then((r) => r.data.data) })
-  return <Panel title="Reports"><DataTable rows={[report.data || {}]} columns={['revenue', 'orders', 'fromDate', 'toDate']} loading={report.isLoading} /></Panel>
+  const revenue = useQuery({ queryKey: ['reports-revenue'], queryFn: () => api.get('/reports/revenue').then((r) => r.data.data) })
+  const products = useQuery({ queryKey: ['reports-products'], queryFn: () => api.get('/reports/products').then((r) => r.data.data) })
+  const inventory = useQuery({ queryKey: ['reports-inventory'], queryFn: () => api.get('/reports/inventory').then((r) => r.data.data) })
+  const customers = useQuery({ queryKey: ['reports-customers'], queryFn: () => api.get('/reports/customers').then((r) => r.data.data) })
+  const affiliate = useQuery({ queryKey: ['reports-affiliate'], queryFn: () => api.get('/reports/affiliate').then((r) => r.data.data) })
+  return (
+    <section>
+      <PageTitle title="Reports" action="Export CSV" />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Revenue"><DataTable rows={[revenue.data || {}]} columns={['revenue', 'orders', 'fromDate', 'toDate']} loading={revenue.isLoading} /></Panel>
+        <Panel title="Inventory"><DataTable rows={[inventory.data || {}]} columns={['lowStock', 'outOfStock']} loading={inventory.isLoading} /></Panel>
+        <Panel title="Customers"><DataTable rows={[customers.data || {}]} columns={['customers', 'orders', 'averageOrdersPerCustomer']} loading={customers.isLoading} /></Panel>
+        <Panel title="Affiliate"><DataTable rows={[affiliate.data || {}]} columns={['partners', 'estimatedCommission']} loading={affiliate.isLoading} /></Panel>
+      </div>
+      <Panel title="Best Sellers" className="mt-4"><DataTable rows={products.data || []} columns={['name', 'quantitySold', 'revenue']} loading={products.isLoading} /></Panel>
+    </section>
+  )
 }
 
 function SettingsPage() {
   const store = useQuery({ queryKey: ['settings-store'], queryFn: () => api.get('/settings/store').then((r) => r.data.data) })
-  return <Panel title="Store Settings"><DataTable rows={[store.data || {}]} columns={['storeName', 'address', 'timeZone']} loading={store.isLoading} /></Panel>
+  const general = useQuery({ queryKey: ['settings-general'], queryFn: () => api.get('/settings/general').then((r) => r.data.data) })
+  const [storeForm, setStoreForm] = useState({ storeName: '', logoUrl: '', address: '', timeZone: 'Asia/Saigon' })
+  const [generalForm, setGeneralForm] = useState({ taxRate: 0, currency: 'VND', language: 'vi' })
+  const activeStore = store.data || storeForm
+  const activeGeneral = general.data || generalForm
+  async function saveStore() {
+    try {
+      await api.put('/settings/store', { ...activeStore, ...storeForm })
+      toast.success('Store settings saved')
+      store.refetch()
+    } catch {
+      toast.error('Store settings failed')
+    }
+  }
+  async function saveGeneral() {
+    try {
+      await api.put('/settings/general', { ...activeGeneral, ...generalForm, taxRate: Number(generalForm.taxRate || activeGeneral.taxRate || 0) })
+      toast.success('General settings saved')
+      general.refetch()
+    } catch {
+      toast.error('General settings failed')
+    }
+  }
+  async function backup() {
+    try {
+      await api.post('/settings/backup')
+      toast.success('Backup queued')
+    } catch {
+      toast.error('Backup failed')
+    }
+  }
+  return (
+    <section>
+      <PageTitle title="Settings" action="System" />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Store">
+          <FormInput label="Store Name" value={storeForm.storeName || activeStore.storeName} onChange={(value) => setStoreForm({ ...storeForm, storeName: value })} />
+          <FormInput label="Logo URL" value={storeForm.logoUrl || activeStore.logoUrl || ''} onChange={(value) => setStoreForm({ ...storeForm, logoUrl: value })} />
+          <FormInput label="Address" value={storeForm.address || activeStore.address} onChange={(value) => setStoreForm({ ...storeForm, address: value })} />
+          <FormInput label="Time Zone" value={storeForm.timeZone || activeStore.timeZone} onChange={(value) => setStoreForm({ ...storeForm, timeZone: value })} />
+          <button onClick={saveStore} className="mt-4 rounded-md bg-brand px-4 py-2 text-white">Save Store</button>
+        </Panel>
+        <Panel title="General">
+          <FormInput label="Tax Rate" type="number" value={generalForm.taxRate || activeGeneral.taxRate} onChange={(value) => setGeneralForm({ ...generalForm, taxRate: value })} />
+          <FormInput label="Currency" value={generalForm.currency || activeGeneral.currency} onChange={(value) => setGeneralForm({ ...generalForm, currency: value })} />
+          <FormInput label="Language" value={generalForm.language || activeGeneral.language} onChange={(value) => setGeneralForm({ ...generalForm, language: value })} />
+          <div className="mt-4 flex gap-2">
+            <button onClick={saveGeneral} className="rounded-md bg-brand px-4 py-2 text-white">Save General</button>
+            <button onClick={backup} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Backup</button>
+          </div>
+        </Panel>
+      </div>
+    </section>
+  )
 }
 
 function Panel({ title, children, className = '' }) {
