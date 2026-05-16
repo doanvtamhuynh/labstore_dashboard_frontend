@@ -1,0 +1,49 @@
+## Frontend Scaffold + Auth + Admin Shell
+- Routes:
+  - /login
+  - /dashboard
+  - /products
+  - /products/create
+  - /products/:id/edit
+  - /categories
+  - /orders
+  - /orders/:id
+  - /customers
+  - /customers/:id
+  - /promotions/coupons
+  - /promotions/flash-sales
+  - /promotions/banners
+  - /promotions/affiliate
+  - /payments
+  - /shipping
+  - /shipping/returns
+  - /reviews
+  - /support/tickets
+  - /support/live-chat
+  - /support/faq
+  - /notifications
+  - /reports
+  - /seo
+  - /blog
+  - /settings
+  - /settings/admins
+  - /settings/audit-log
+- API endpoints connected:
+  - POST /api/auth/login
+  - POST /api/auth/refresh-token
+  - GET /api/dashboard/summary
+  - GET /api/dashboard/revenue-chart
+  - GET /api/dashboard/top-products
+  - Generic resource pages connect to products, categories, orders, customers, promotions, payments, shipping, reviews, support, notifications, reports, SEO, blog, and settings endpoints.
+- Main files:
+  - src/App.jsx
+  - src/main.jsx
+  - src/services/api.js
+  - src/index.css
+  - tailwind.config.js
+- Notes:
+  - React + Vite + Tailwind scaffolded.
+  - Protected route guard redirects unauthenticated users to /login.
+  - Axios client attaches JWT and refreshes access token on 401.
+  - Main layout includes sidebar, header, dark/light toggle, logout, dashboard charts, resource tables, loading and empty states.
+  - Build verified with npm run build.
