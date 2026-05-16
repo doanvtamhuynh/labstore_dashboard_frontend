@@ -568,6 +568,3 @@ fabric.properties
 ### AndroidStudio Patch ###
 
 !/gradle/wrapper/gradle-wrapper.jar
-
-prompt.md
-AGENTS.md
