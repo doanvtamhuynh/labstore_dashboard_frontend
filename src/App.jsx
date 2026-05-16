@@ -539,6 +539,10 @@ function ProductFormEditor({ id, initialForm }) {
             <span>Description</span>
             <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 h-32 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
           </label>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <ProductVariants variants={form.variants} onChange={(variants) => setForm({ ...form, variants })} />
+            <ProductImages images={form.images} onChange={(images) => setForm({ ...form, images })} />
+          </div>
         </Panel>
         <Panel title="SEO">
           <FormInput label="SEO Title" value={form.seo.title || ''} onChange={(value) => setForm({ ...form, seo: { ...form.seo, title: value } })} />
@@ -551,6 +555,59 @@ function ProductFormEditor({ id, initialForm }) {
         </Panel>
       </form>
     </section>
+  )
+}
+
+function ProductVariants({ variants, onChange }) {
+  function update(index, key, value) {
+    onChange(variants.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: key === 'price' || key === 'stock' ? Number(value) : value } : item))
+  }
+  return (
+    <div className="rounded-md border border-line p-3 dark:border-zinc-800">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Variants</h3>
+        <button type="button" onClick={() => onChange([...variants, { name: '', sku: '', price: 0, stock: 0, attributes: {} }])} className="text-sm text-brand">Add</button>
+      </div>
+      <div className="space-y-3">
+        {variants.map((variant, index) => (
+          <div key={variant.id || index} className="grid gap-2 rounded-md bg-slate-50 p-3 dark:bg-zinc-950">
+            <input value={variant.name || ''} onChange={(event) => update(index, 'name', event.target.value)} placeholder="Variant name" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input value={variant.sku || ''} onChange={(event) => update(index, 'sku', event.target.value)} placeholder="Variant SKU" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" value={variant.price || 0} onChange={(event) => update(index, 'price', event.target.value)} placeholder="Price" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+              <input type="number" value={variant.stock || 0} onChange={(event) => update(index, 'stock', event.target.value)} placeholder="Stock" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            </div>
+            <button type="button" onClick={() => onChange(variants.filter((_, itemIndex) => itemIndex !== index))} className="text-left text-sm text-berry">Remove</button>
+          </div>
+        ))}
+        {variants.length === 0 && <div className="text-sm text-slate-500">No variants</div>}
+      </div>
+    </div>
+  )
+}
+
+function ProductImages({ images, onChange }) {
+  function update(index, key, value) {
+    onChange(images.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: key === 'sortOrder' ? Number(value) : value } : item))
+  }
+  return (
+    <div className="rounded-md border border-line p-3 dark:border-zinc-800">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Images</h3>
+        <button type="button" onClick={() => onChange([...images, { url: '', alt: '', sortOrder: images.length }])} className="text-sm text-brand">Add</button>
+      </div>
+      <div className="space-y-3">
+        {images.map((image, index) => (
+          <div key={index} className="grid gap-2 rounded-md bg-slate-50 p-3 dark:bg-zinc-950">
+            {image.url && <img src={image.url} alt={image.alt || ''} className="h-28 w-full rounded-md object-cover" />}
+            <input value={image.url || ''} onChange={(event) => update(index, 'url', event.target.value)} placeholder="Image URL" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <input value={image.alt || ''} onChange={(event) => update(index, 'alt', event.target.value)} placeholder="Alt text" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
+            <button type="button" onClick={() => onChange(images.filter((_, itemIndex) => itemIndex !== index))} className="text-left text-sm text-berry">Remove</button>
+          </div>
+        ))}
+        {images.length === 0 && <div className="text-sm text-slate-500">No images</div>}
+      </div>
+    </div>
   )
 }
 
