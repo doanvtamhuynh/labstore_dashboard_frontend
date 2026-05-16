@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import {
-  Bell, Boxes, ChartNoAxesCombined, ChevronLeft, ClipboardList, CreditCard, FileText, Home,
+  Bell, Boxes, ChartNoAxesCombined, ChevronLeft, ClipboardList, CreditCard, FileText,
   LayoutDashboard, LogOut, Megaphone, Menu, Moon, Package, Search, Settings, ShieldCheck,
   Star, Sun, Tags, Truck, Users, MessageSquare, Globe2,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, login, tokenStore } from './services/api'
@@ -164,8 +164,8 @@ function RoutesContent() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/products/create" element={<ProductForm />} />
       <Route path="/products/:id/edit" element={<ProductForm />} />
-      <Route path="/orders/:id" element={<Detail title="Order Detail" />} />
-      <Route path="/customers/:id" element={<Detail title="Customer Detail" />} />
+      <Route path="/orders/:id" element={<OrderDetail />} />
+      <Route path="/customers/:id" element={<CustomerDetail />} />
       <Route path="/support/live-chat" element={<LiveChat />} />
       <Route path="/reports" element={<Reports />} />
       <Route path="/settings" element={<SettingsPage />} />
@@ -199,6 +199,7 @@ function Dashboard() {
 }
 
 function ResourcePage({ config }) {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [editor, setEditor] = useState(() => JSON.stringify(config.sample || {}, null, 2))
   const [selected, setSelected] = useState(null)
@@ -241,7 +242,7 @@ function ResourcePage({ config }) {
         {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
-        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
+        <Panel title={`${rows.length} records`}><DataTable rows={rows} columns={config.columns} loading={query.isLoading} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canMutate ? remove : null} /></Panel>
         {canMutate && (
           <Panel title={selected ? `Edit ${selected.id}` : 'Create JSON'}>
             <textarea value={editor} onChange={(event) => setEditor(event.target.value)} className="h-80 w-full rounded-md border border-line bg-slate-50 p-3 font-mono text-xs outline-none focus:border-brand dark:border-zinc-700 dark:bg-zinc-950" />
@@ -256,14 +257,14 @@ function ResourcePage({ config }) {
   )
 }
 
-function DataTable({ rows, columns, loading, onEdit, onDelete }) {
+function DataTable({ rows, columns, loading, onView, onEdit, onDelete }) {
   if (loading) return <div className="h-32 animate-pulse rounded-md bg-slate-100 dark:bg-zinc-800" />
   if (!rows.length) return <div className="py-10 text-center text-slate-500">No records found</div>
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
+        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(onView || onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(onView || onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onView && <button onClick={() => onView(row)} className="mr-2 text-slate-600 dark:text-zinc-300">View</button>}{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
       </table>
     </div>
   )
@@ -276,8 +277,172 @@ function format(value) {
   return String(value)
 }
 
+const emptyProductForm = {
+  name: '',
+  slug: '',
+  description: '',
+  categoryId: '',
+  sku: '',
+  price: 0,
+  salePrice: null,
+  stock: 0,
+  status: 'Visible',
+  variants: [],
+  images: [],
+  seo: { title: '', description: '', slug: '' },
+}
+
+function toProductForm(product) {
+  if (!product) return emptyProductForm
+  return {
+    name: product.name || '',
+    slug: product.slug || '',
+    description: product.description || '',
+    categoryId: product.categoryId || '',
+    sku: product.sku || '',
+    price: product.price || 0,
+    salePrice: product.salePrice,
+    stock: product.stock || 0,
+    status: product.status || 'Visible',
+    variants: product.variants || [],
+    images: product.images?.map((image) => ({ url: image.url, alt: image.alt, sortOrder: image.sortOrder })) || [],
+    seo: product.seo || { title: '', description: '', slug: '' },
+  }
+}
+
 function ProductForm() {
-  return <Detail title="Product Form" description="Create and edit product information, variants, images, inventory, pricing, and SEO metadata." />
+  const { id } = useParams()
+  const product = useQuery({ queryKey: ['product', id], enabled: Boolean(id), queryFn: () => api.get(`/products/${id}`).then((r) => r.data.data) })
+  if (id && product.isLoading) return <Panel title="Product Form"><div className="h-40 animate-pulse rounded-md bg-slate-100 dark:bg-zinc-800" /></Panel>
+  return <ProductFormEditor id={id} initialForm={toProductForm(product.data)} />
+}
+
+function ProductFormEditor({ id, initialForm }) {
+  const navigate = useNavigate()
+  const [form, setForm] = useState(initialForm)
+  async function submit(event) {
+    event.preventDefault()
+    const payload = { ...form, categoryId: form.categoryId || null, salePrice: form.salePrice === '' ? null : form.salePrice }
+    try {
+      if (id) await api.put(`/products/${id}`, payload)
+      else await api.post('/products', payload)
+      toast.success(id ? 'Product updated' : 'Product created')
+      navigate('/products')
+    } catch {
+      toast.error('Product save failed')
+    }
+  }
+  return (
+    <section>
+      <PageTitle title={id ? 'Edit Product' : 'Create Product'} action="Products" />
+      <form onSubmit={submit} className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <Panel title="Product Information">
+          <div className="grid gap-3 md:grid-cols-2">
+            <FormInput label="Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
+            <FormInput label="SKU" value={form.sku} onChange={(value) => setForm({ ...form, sku: value })} />
+            <FormInput label="Slug" value={form.slug} onChange={(value) => setForm({ ...form, slug: value })} />
+            <FormInput label="Category ID" value={form.categoryId} onChange={(value) => setForm({ ...form, categoryId: value })} />
+            <FormInput label="Price" type="number" value={form.price} onChange={(value) => setForm({ ...form, price: Number(value) })} />
+            <FormInput label="Stock" type="number" value={form.stock} onChange={(value) => setForm({ ...form, stock: Number(value) })} />
+            <label className="text-sm font-medium">
+              <span>Status</span>
+              <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950">
+                {['Visible', 'Hidden', 'OutOfStock'].map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="mt-3 block text-sm font-medium">
+            <span>Description</span>
+            <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 h-32 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+          </label>
+        </Panel>
+        <Panel title="SEO">
+          <FormInput label="SEO Title" value={form.seo.title || ''} onChange={(value) => setForm({ ...form, seo: { ...form.seo, title: value } })} />
+          <FormInput label="SEO Slug" value={form.seo.slug || ''} onChange={(value) => setForm({ ...form, seo: { ...form.seo, slug: value } })} />
+          <label className="mt-3 block text-sm font-medium">
+            <span>SEO Description</span>
+            <textarea value={form.seo.description || ''} onChange={(event) => setForm({ ...form, seo: { ...form.seo, description: event.target.value } })} className="mt-1 h-24 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+          </label>
+          <button className="mt-4 w-full rounded-md bg-brand px-4 py-2 font-medium text-white">Save Product</button>
+        </Panel>
+      </form>
+    </section>
+  )
+}
+
+function FormInput({ label, value, onChange, type = 'text' }) {
+  return (
+    <label className="text-sm font-medium">
+      <span>{label}</span>
+      <input type={type} value={value ?? ''} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+    </label>
+  )
+}
+
+function OrderDetail() {
+  const { id } = useParams()
+  const order = useQuery({ queryKey: ['order', id], queryFn: () => api.get(`/orders/${id}`).then((r) => r.data.data) })
+  const [status, setStatus] = useState('Processing')
+  async function updateStatus() {
+    try {
+      await api.patch(`/orders/${id}/status`, { status, note: 'Updated from dashboard' })
+      toast.success('Order status updated')
+      order.refetch()
+    } catch {
+      toast.error('Status update failed')
+    }
+  }
+  return (
+    <section>
+      <PageTitle title="Order Detail" action={order.data?.code || id} />
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <Panel title="Items"><DataTable rows={order.data?.items || []} columns={['productName', 'sku', 'quantity', 'price', 'lineTotal']} loading={order.isLoading} /></Panel>
+        <Panel title="Status">
+          <div className="text-sm text-slate-500">Current: {order.data?.status || '-'}</div>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950">{['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'].map((item) => <option key={item}>{item}</option>)}</select>
+          <button onClick={updateStatus} className="mt-3 w-full rounded-md bg-brand px-4 py-2 text-white">Update Status</button>
+          <a href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/orders/${id}/invoice`} className="mt-2 block rounded-md border border-line px-4 py-2 text-center dark:border-zinc-700">Invoice PDF</a>
+        </Panel>
+      </div>
+      <Panel title="History" className="mt-4"><DataTable rows={order.data?.history || []} columns={['fromStatus', 'toStatus', 'note', 'changedBy', 'changedAtUtc']} /></Panel>
+    </section>
+  )
+}
+
+function CustomerDetail() {
+  const { id } = useParams()
+  const detail = useQuery({ queryKey: ['customer', id], queryFn: () => api.get(`/customers/${id}`).then((r) => r.data.data) })
+  const [segment, setSegment] = useState('VIP')
+  const [points, setPoints] = useState(0)
+  const [note, setNote] = useState('')
+  async function action(kind) {
+    try {
+      if (kind === 'segment') await api.put(`/customers/${id}/segment`, { segment })
+      if (kind === 'loyalty') await api.put(`/customers/${id}/loyalty`, { points: Number(points) })
+      if (kind === 'note') await api.post(`/customers/${id}/notes`, { content: note })
+      toast.success('Customer updated')
+      detail.refetch()
+    } catch {
+      toast.error('Customer update failed')
+    }
+  }
+  return (
+    <section>
+      <PageTitle title={detail.data?.customer?.fullName || 'Customer Detail'} action={detail.data?.customer?.email || id} />
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <Panel title="Purchase History"><DataTable rows={detail.data?.orders || []} columns={['code', 'status', 'paymentStatus', 'totalAmount', 'createdAtUtc']} loading={detail.isLoading} /></Panel>
+        <Panel title="CRM">
+          <FormInput label="Segment" value={segment} onChange={setSegment} />
+          <button onClick={() => action('segment')} className="mt-2 w-full rounded-md bg-brand px-4 py-2 text-white">Set Segment</button>
+          <FormInput label="Loyalty Points" type="number" value={points} onChange={setPoints} />
+          <button onClick={() => action('loyalty')} className="mt-2 w-full rounded-md bg-brand px-4 py-2 text-white">Set Loyalty</button>
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="CRM note" className="mt-3 h-24 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+          <button onClick={() => action('note')} className="mt-2 w-full rounded-md border border-line px-4 py-2 dark:border-zinc-700">Add Note</button>
+        </Panel>
+      </div>
+      <Panel title="Notes" className="mt-4"><DataTable rows={detail.data?.customer?.notes || []} columns={['content', 'createdBy', 'createdAtUtc']} /></Panel>
+    </section>
+  )
 }
 
 function Detail({ title, description = 'Operational detail view connected to the protected dashboard shell.' }) {

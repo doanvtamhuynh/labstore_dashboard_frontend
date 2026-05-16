@@ -47,4 +47,8 @@
   - Axios client attaches JWT and refreshes access token on 401.
   - Main layout includes sidebar, header, dark/light toggle, logout, dashboard charts, resource tables, loading and empty states.
   - CRUD-capable resource pages include reusable JSON create/edit/delete panel for categories, promotions, shipping, support, notifications, SEO, and blog modules.
+  - Product create/edit form now calls POST/PUT /api/products with inventory, status, description, and SEO fields.
+  - Order detail connects GET /api/orders/{id}, PATCH /api/orders/{id}/status, history table, and invoice PDF link.
+  - Customer detail connects GET /api/customers/{id}, segment update, loyalty update, CRM notes, and purchase history.
+  - Lint verified with npm run lint.
   - Build verified with npm run build.
