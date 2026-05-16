@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { FormInput } from '../../components/Fields'
 import { PageTitle, Panel } from '../../components/Panel'
 import { api } from '../../services/api'
+import { API_ORIGIN } from '../../utils/data'
 
 const emptyProductForm = {
   name: '',
@@ -49,6 +50,7 @@ export function ProductForm() {
 function ProductFormEditor({ id, initialForm }) {
   const navigate = useNavigate()
   const [form, setForm] = useState(initialForm)
+  const productRefresh = useQuery({ queryKey: ['product-refresh', id], enabled: false, queryFn: () => api.get(`/products/${id}`).then((r) => r.data.data) })
 
   async function submit(event) {
     event.preventDefault()
@@ -84,11 +86,14 @@ function ProductFormEditor({ id, initialForm }) {
           </div>
           <label className="mt-3 block text-sm font-medium">
             <span>Description</span>
-            <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 h-32 w-full rounded-md border border-line bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-950" />
+            <RichTextBox value={form.description} onChange={(description) => setForm({ ...form, description })} />
           </label>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <ProductVariants variants={form.variants} onChange={(variants) => setForm({ ...form, variants })} />
-            <ProductImages images={form.images} onChange={(images) => setForm({ ...form, images })} />
+            <ProductImages productId={id} images={form.images} onChange={(images) => setForm({ ...form, images })} onUploaded={async () => {
+              const refreshed = await productRefresh.refetch()
+              if (refreshed.data) setForm(toProductForm(refreshed.data))
+            }} />
           </div>
         </Panel>
         <Panel title="SEO">
@@ -102,6 +107,22 @@ function ProductFormEditor({ id, initialForm }) {
         </Panel>
       </form>
     </section>
+  )
+}
+
+function RichTextBox({ value, onChange }) {
+  function insert(tag) {
+    onChange(`${value || ''}<${tag}></${tag}>`)
+  }
+
+  return (
+    <div className="mt-1 rounded-md border border-line bg-white dark:border-zinc-700 dark:bg-zinc-950">
+      <div className="flex flex-wrap gap-1 border-b border-line p-2 dark:border-zinc-800">
+        {['p', 'h2', 'strong', 'em', 'ul'].map((tag) => <button key={tag} type="button" onClick={() => insert(tag)} className="rounded border border-line px-2 py-1 text-xs dark:border-zinc-700">{tag}</button>)}
+      </div>
+      <textarea value={value || ''} onChange={(event) => onChange(event.target.value)} className="h-32 w-full bg-transparent px-3 py-2 outline-none" />
+      <div className="border-t border-line p-3 text-sm text-slate-600 dark:border-zinc-800 dark:text-zinc-300" dangerouslySetInnerHTML={{ __html: value || '<p>Preview</p>' }} />
+    </div>
   )
 }
 
@@ -134,21 +155,45 @@ function ProductVariants({ variants, onChange }) {
   )
 }
 
-function ProductImages({ images, onChange }) {
+function ProductImages({ productId, images, onChange, onUploaded }) {
+  const [uploading, setUploading] = useState(false)
   function update(index, key, value) {
     onChange(images.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: key === 'sortOrder' ? Number(value) : value } : item))
+  }
+  async function upload(event) {
+    const file = event.target.files?.[0]
+    if (!file || !productId) return
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('alt', file.name)
+    formData.append('sortOrder', String(images.length))
+    setUploading(true)
+    try {
+      await api.post(`/products/${productId}/images`, formData)
+      toast.success('Image uploaded')
+      await onUploaded?.()
+    } catch {
+      toast.error('Image upload failed')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
   }
 
   return (
     <div className="rounded-md border border-line p-3 dark:border-zinc-800">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold">Images</h3>
-        <button type="button" onClick={() => onChange([...images, { url: '', alt: '', sortOrder: images.length }])} className="text-sm text-brand">Add</button>
+        <div className="flex gap-2">
+          {productId && <label className="cursor-pointer text-sm text-brand">{uploading ? 'Uploading...' : 'Upload'}<input type="file" accept="image/*" onChange={upload} className="hidden" /></label>}
+          <button type="button" onClick={() => onChange([...images, { url: '', alt: '', sortOrder: images.length }])} className="text-sm text-brand">Add URL</button>
+        </div>
       </div>
+      {productId && <label className="mb-3 flex min-h-24 cursor-pointer items-center justify-center rounded-md border border-dashed border-line bg-slate-50 p-3 text-center text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-950">Choose an image file<input type="file" accept="image/*" onChange={upload} className="hidden" /></label>}
       <div className="space-y-3">
         {images.map((image, index) => (
           <div key={index} className="grid gap-2 rounded-md bg-slate-50 p-3 dark:bg-zinc-950">
-            {image.url && <img src={image.url} alt={image.alt || ''} className="h-28 w-full rounded-md object-cover" />}
+            {image.url && <img src={image.url.startsWith('/uploads') ? `${API_ORIGIN}${image.url}` : image.url} alt={image.alt || ''} className="h-28 w-full rounded-md object-cover" />}
             <input value={image.url || ''} onChange={(event) => update(index, 'url', event.target.value)} placeholder="Image URL" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
             <input value={image.alt || ''} onChange={(event) => update(index, 'alt', event.target.value)} placeholder="Alt text" className="rounded-md border border-line bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900" />
             <button type="button" onClick={() => onChange(images.filter((_, itemIndex) => itemIndex !== index))} className="text-left text-sm text-berry">Remove</button>

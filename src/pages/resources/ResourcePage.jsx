@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ConfirmDialog, DataTable } from '../../components/DataTable'
 import { PageTitle, Panel } from '../../components/Panel'
-import { api, tokenStore } from '../../services/api'
+import { api } from '../../services/api'
 import { pickRows } from '../../utils/data'
 
 export function ResourcePage({ config }) {
@@ -113,53 +113,7 @@ export function ResourcePage({ config }) {
     setSelectedIds((ids) => allSelected ? ids.filter((id) => !visibleIds.includes(id)) : [...new Set([...ids, ...visibleIds])])
   }
 
-  async function runRowAction(row, action) {
-    try {
-      if (action === 'refund') {
-        const amount = Number(window.prompt('Refund amount', row.amount - (row.refundedAmount || 0)))
-        if (!amount) return
-        await api.post(`/payments/${row.id}/refund`, { amount, reason: 'Dashboard refund' })
-      }
-      if (action === 'approve-review') await api.patch(`/reviews/${row.id}/status`, { status: 'Approved' })
-      if (action === 'hide-review') await api.patch(`/reviews/${row.id}/status`, { status: 'Hidden' })
-      if (action === 'reply-review') {
-        const reply = window.prompt('Reply')
-        if (!reply) return
-        await api.post(`/reviews/${row.id}/reply`, { reply })
-      }
-      if (action === 'read-notification') await api.patch(`/notifications/${row.id}/read`)
-      if (action === 'lock-customer') await api.patch(`/customers/${row.id}/status`, { status: 'Locked' })
-      if (action === 'unlock-customer') await api.patch(`/customers/${row.id}/status`, { status: 'Active' })
-      if (action === 'order-status') {
-        const status = window.prompt('Order status', row.status || 'Processing')
-        if (!status) return
-        await api.patch(`/orders/${row.id}/status`, { status, note: 'Updated from list' })
-      }
-      if (action === 'assign-ticket') {
-        const assignedTo = window.prompt('Assign to', row.assignedTo || tokenStore.getUser()?.email || '')
-        if (!assignedTo) return
-        await api.patch(`/support/tickets/${row.id}/assign`, { assignedTo })
-      }
-      if (action === 'ticket-status') {
-        const status = window.prompt('Ticket status', row.status || 'Pending')
-        if (!status) return
-        await api.patch(`/support/tickets/${row.id}/status`, { status })
-      }
-      toast.success('Action completed')
-      query.refetch()
-    } catch {
-      toast.error('Action failed')
-    }
-  }
-
-  const rowActions = {
-    '/orders': [{ label: 'Status', action: 'order-status' }],
-    '/customers': [{ label: 'Lock', action: 'lock-customer' }, { label: 'Unlock', action: 'unlock-customer' }],
-    '/payments': [{ label: 'Refund', action: 'refund' }],
-    '/reviews': [{ label: 'Approve', action: 'approve-review' }, { label: 'Hide', action: 'hide-review' }, { label: 'Reply', action: 'reply-review' }],
-    '/support/tickets': [{ label: 'Assign', action: 'assign-ticket' }, { label: 'Status', action: 'ticket-status' }],
-    '/notifications': [{ label: 'Read', action: 'read-notification' }],
-  }[config.endpoint] || []
+  const rowActions = []
 
   return (
     <section>
@@ -176,7 +130,7 @@ export function ResourcePage({ config }) {
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
         <Panel title={`${rows.length} records`}>
-          <DataTable rows={visibleRows} columns={config.columns} loading={query.isLoading} selectedIds={selectedIds} onToggleRow={canDelete ? toggleRow : null} onToggleAll={canDelete ? toggleVisibleRows : null} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canDelete ? (row) => requestDelete([row.id]) : null} />
+          <DataTable rows={visibleRows} columns={config.columns} loading={query.isLoading} selectedIds={selectedIds} onToggleRow={canDelete ? toggleRow : null} onToggleAll={canDelete ? toggleVisibleRows : null} rowActions={rowActions} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canDelete ? (row) => requestDelete([row.id]) : null} />
           <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm dark:border-zinc-800">
             <span className="text-slate-500">Page {page} of {totalPages}</span>
             <div className="flex gap-2">

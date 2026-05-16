@@ -11,6 +11,7 @@ export function SettingsPage() {
   const [storeForm, setStoreForm] = useState({ storeName: '', logoUrl: '', address: '', timeZone: 'Asia/Saigon' })
   const [generalForm, setGeneralForm] = useState({ taxRate: 0, currency: 'VND', language: 'vi' })
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
+  const [backupResult, setBackupResult] = useState(null)
   const activeStore = store.data || storeForm
   const activeGeneral = general.data || generalForm
 
@@ -36,8 +37,9 @@ export function SettingsPage() {
 
   async function backup() {
     try {
-      await api.post('/settings/backup')
-      toast.success('Backup queued')
+      const response = await api.post('/settings/backup')
+      setBackupResult(response.data.data)
+      toast.success('Backup completed')
     } catch {
       toast.error('Backup failed')
     }
@@ -72,6 +74,7 @@ export function SettingsPage() {
             <button onClick={saveGeneral} className="rounded-md bg-brand px-4 py-2 text-white">Save General</button>
             <button onClick={backup} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Backup</button>
           </div>
+          {backupResult && <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs text-slate-600 dark:bg-zinc-950 dark:text-zinc-300"><div>Status: {backupResult.status}</div><div>Size: {Number(backupResult.sizeBytes || 0).toLocaleString()} bytes</div><div className="truncate">Path: {backupResult.filePath}</div></div>}
         </Panel>
         <Panel title="Security">
           <FormInput label="Current Password" type="password" value={passwordForm.currentPassword} onChange={(value) => setPasswordForm({ ...passwordForm, currentPassword: value })} />

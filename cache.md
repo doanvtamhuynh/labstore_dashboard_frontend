@@ -74,5 +74,13 @@
   - Categories now use a dedicated tree management page at /categories with create/edit/delete, parent selection, active toggle, and sort order.
   - SEO page at /seo now has dedicated meta CRUD form, table actions, delete confirmation, and search snippet preview.
   - Blog page at /blog now has dedicated post CRUD form, status selector, delete confirmation, and content preview.
+  - Promotions, shipping, support tickets, FAQ, notifications, and admins now use structured forms instead of JSON editor pages.
+  - Dashboard includes period switching, KPI cards, and geo-order distribution panel.
+  - Payments page now has reconciliation cards and refund modal.
+  - Reviews page now has status/rating filters, moderation actions, and reply modal.
+  - Orders and customers have dedicated list pages with filters and quick actions.
+  - Reports page supports CSV and PDF export buttons per report.
+  - Product form includes lightweight rich text editing/preview and image file upload on edit.
+  - Settings backup action displays completed backup path and size.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
