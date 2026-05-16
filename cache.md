@@ -72,5 +72,7 @@
   - 2FA UI was removed from login, settings security panel, and admins table per product decision.
   - Frontend code was split from a single App.jsx into React-standard folders: components, config, layouts, pages, utils.
   - Categories now use a dedicated tree management page at /categories with create/edit/delete, parent selection, active toggle, and sort order.
+  - SEO page at /seo now has dedicated meta CRUD form, table actions, delete confirmation, and search snippet preview.
+  - Blog page at /blog now has dedicated post CRUD form, status selector, delete confirmation, and content preview.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
