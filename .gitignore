@@ -569,5 +569,5 @@ fabric.properties
 
 !/gradle/wrapper/gradle-wrapper.jar
 
-cache.md
 prompt.md
+AGENTS.md
