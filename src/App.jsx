@@ -369,6 +369,23 @@ function ResourcePage({ config }) {
         await api.post(`/reviews/${row.id}/reply`, { reply })
       }
       if (action === 'read-notification') await api.patch(`/notifications/${row.id}/read`)
+      if (action === 'lock-customer') await api.patch(`/customers/${row.id}/status`, { status: 'Locked' })
+      if (action === 'unlock-customer') await api.patch(`/customers/${row.id}/status`, { status: 'Active' })
+      if (action === 'order-status') {
+        const status = window.prompt('Order status', row.status || 'Processing')
+        if (!status) return
+        await api.patch(`/orders/${row.id}/status`, { status, note: 'Updated from list' })
+      }
+      if (action === 'assign-ticket') {
+        const assignedTo = window.prompt('Assign to', row.assignedTo || tokenStore.getUser()?.email || '')
+        if (!assignedTo) return
+        await api.patch(`/support/tickets/${row.id}/assign`, { assignedTo })
+      }
+      if (action === 'ticket-status') {
+        const status = window.prompt('Ticket status', row.status || 'Pending')
+        if (!status) return
+        await api.patch(`/support/tickets/${row.id}/status`, { status })
+      }
       toast.success('Action completed')
       query.refetch()
     } catch {
@@ -376,8 +393,11 @@ function ResourcePage({ config }) {
     }
   }
   const rowActions = {
+    '/orders': [{ label: 'Status', action: 'order-status' }],
+    '/customers': [{ label: 'Lock', action: 'lock-customer' }, { label: 'Unlock', action: 'unlock-customer' }],
     '/payments': [{ label: 'Refund', action: 'refund' }],
     '/reviews': [{ label: 'Approve', action: 'approve-review' }, { label: 'Hide', action: 'hide-review' }, { label: 'Reply', action: 'reply-review' }],
+    '/support/tickets': [{ label: 'Assign', action: 'assign-ticket' }, { label: 'Status', action: 'ticket-status' }],
     '/notifications': [{ label: 'Read', action: 'read-notification' }],
   }[config.endpoint] || []
   return (

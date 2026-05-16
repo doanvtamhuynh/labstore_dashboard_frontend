@@ -68,5 +68,6 @@
   - CRUD-capable tables support checkbox selection and bulk delete with confirmation dialog.
   - Vite build splits React, charts, query, realtime, and vendor chunks to avoid oversized bundle warnings.
   - Product form supports variants and image URL preview/editing in addition to base information and SEO.
+  - Orders, customers, and support tickets tables include quick operational actions for status, lock/unlock, assignment, and ticket status.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
