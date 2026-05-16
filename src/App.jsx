@@ -124,11 +124,11 @@ function Field({ label, value, onChange, type = 'text' }) {
 }
 
 function Shell() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifyOpen, setNotifyOpen] = useState(false)
   const [liveNotifications, setLiveNotifications] = useState([])
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const navigate = useNavigate()
   const user = tokenStore.getUser()
   const notifications = useQuery({ queryKey: ['header-notifications'], queryFn: () => api.get('/notifications').then((r) => pickRows(r.data)), refetchInterval: 60000 })
@@ -143,6 +143,12 @@ function Shell() {
     connection.start().then(() => connection.invoke('JoinAdminChannel')).catch(() => {})
     return () => { connection.stop() }
   }, [])
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', String(collapsed))
+  }, [collapsed])
+  useEffect(() => {
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
   const unread = [...liveNotifications, ...(notifications.data || [])].filter((item) => !item.isRead).length
   const filteredNav = nav.filter(([label]) => user?.role === 'SuperAdmin' || !['Admins', 'Audit Log'].includes(label))
   const sidebarLinks = (
@@ -258,6 +264,8 @@ function ResourcePage({ config }) {
   const [page, setPage] = useState(1)
   const [editor, setEditor] = useState(() => JSON.stringify(config.sample || {}, null, 2))
   const [selected, setSelected] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [confirmAction, setConfirmAction] = useState(null)
   const query = useQuery({ queryKey: [config.endpoint], queryFn: () => api.get(config.endpoint).then((r) => pickRows(r.data)) })
   const rows = useMemo(() => (query.data || [])
     .filter((row) => JSON.stringify(row).toLowerCase().includes(search.toLowerCase()))
@@ -267,6 +275,7 @@ function ResourcePage({ config }) {
   const statusOptions = useMemo(() => [...new Set((query.data || []).flatMap((row) => [row.status, row.paymentStatus]).filter(Boolean))], [query.data])
   const canMutate = Boolean(config.sample)
   const canProductManage = config.endpoint === '/products'
+  const canDelete = canProductManage || canMutate
   async function exportCsv() {
     const exportEndpoints = {
       '/products': '/products/export',
@@ -318,15 +327,32 @@ function ResourcePage({ config }) {
       toast.error('Invalid JSON or request failed')
     }
   }
-  async function remove(row) {
-    if (!row?.id) return
+  async function deleteRows(ids) {
+    if (!ids.length) return
     try {
-      await api.delete(`${config.endpoint}/${row.id}`)
-      toast.success('Deleted')
+      await Promise.all(ids.map((id) => api.delete(`${config.endpoint}/${id}`)))
+      toast.success(ids.length > 1 ? 'Records deleted' : 'Deleted')
+      setSelectedIds([])
       query.refetch()
     } catch {
       toast.error('Delete failed')
     }
+  }
+  function requestDelete(ids) {
+    setConfirmAction({
+      title: ids.length > 1 ? 'Delete selected records?' : 'Delete this record?',
+      message: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteRows(ids),
+    })
+  }
+  function toggleRow(id) {
+    setSelectedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id])
+  }
+  function toggleVisibleRows() {
+    const visibleIds = visibleRows.map((row) => row.id).filter(Boolean)
+    const allSelected = visibleIds.every((id) => selectedIds.includes(id))
+    setSelectedIds((ids) => allSelected ? ids.filter((id) => !visibleIds.includes(id)) : [...new Set([...ids, ...visibleIds])])
   }
   async function runRowAction(row, action) {
     try {
@@ -365,10 +391,11 @@ function ResourcePage({ config }) {
         {(config.endpoint === '/products' || config.endpoint === '/orders') && <button onClick={exportCsv} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Export CSV</button>}
         {config.endpoint === '/products' && <label className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Import CSV<input type="file" accept=".csv" onChange={importProducts} className="hidden" /></label>}
         {canMutate && <button onClick={() => { setSelected(null); setEditor(JSON.stringify(config.sample, null, 2)) }} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">New JSON</button>}
+        {canDelete && selectedIds.length > 0 && <button onClick={() => requestDelete(selectedIds)} className="rounded-md bg-berry px-4 py-2 text-white">Delete selected ({selectedIds.length})</button>}
       </div>
       <div className={canMutate ? 'grid gap-4 xl:grid-cols-[1fr_420px]' : ''}>
         <Panel title={`${rows.length} records`}>
-          <DataTable rows={visibleRows} columns={config.columns} loading={query.isLoading} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canProductManage || canMutate ? remove : null} />
+          <DataTable rows={visibleRows} columns={config.columns} loading={query.isLoading} selectedIds={selectedIds} onToggleRow={canDelete ? toggleRow : null} onToggleAll={canDelete ? toggleVisibleRows : null} rowActions={rowActions.map((item) => ({ ...item, run: runRowAction }))} onView={config.endpoint === '/orders' || config.endpoint === '/customers' ? (row) => navigate(`${config.endpoint}/${row.id}`) : null} onEdit={canProductManage ? (row) => navigate(`/products/${row.id}/edit`) : canMutate ? (row) => { setSelected(row); setEditor(JSON.stringify(row, null, 2)) } : null} onDelete={canDelete ? (row) => requestDelete([row.id]) : null} />
           <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm dark:border-zinc-800">
             <span className="text-slate-500">Page {page} of {totalPages}</span>
             <div className="flex gap-2">
@@ -387,19 +414,42 @@ function ResourcePage({ config }) {
           </Panel>
         )}
       </div>
+      <ConfirmDialog action={confirmAction} onClose={() => setConfirmAction(null)} />
     </section>
   )
 }
 
-function DataTable({ rows, columns, loading, rowActions = [], onView, onEdit, onDelete }) {
+function DataTable({ rows, columns, loading, selectedIds = [], onToggleRow, onToggleAll, rowActions = [], onView, onEdit, onDelete }) {
   if (loading) return <div className="h-32 animate-pulse rounded-md bg-slate-100 dark:bg-zinc-800" />
   if (!rows.length) return <div className="py-10 text-center text-slate-500">No records found</div>
+  const selectableRows = rows.filter((row) => row.id)
+  const allVisibleSelected = selectableRows.length > 0 && selectableRows.every((row) => selectedIds.includes(row.id))
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead><tr className="border-b border-line dark:border-zinc-800">{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onView && <button onClick={() => onView(row)} className="mr-2 text-slate-600 dark:text-zinc-300">View</button>}{rowActions.map((item) => <button key={item.action} onClick={() => item.run(row, item.action)} className="mr-2 text-brand">{item.label}</button>)}{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
+        <thead><tr className="border-b border-line dark:border-zinc-800">{onToggleRow && <th className="w-10 px-3 py-2"><input type="checkbox" checked={allVisibleSelected} onChange={onToggleAll} /></th>}{columns.map((col) => <th key={col} className="px-3 py-2 font-medium text-slate-500">{col}</th>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <th className="px-3 py-2" />}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr key={row.id || index} className="border-b border-line last:border-0 dark:border-zinc-800">{onToggleRow && <td className="px-3 py-3">{row.id && <input type="checkbox" checked={selectedIds.includes(row.id)} onChange={() => onToggleRow(row.id)} />}</td>}{columns.map((col) => <td key={col} className="px-3 py-3">{format(row[col])}</td>)}{(rowActions.length > 0 || onView || onEdit || onDelete) && <td className="whitespace-nowrap px-3 py-3 text-right">{onView && <button onClick={() => onView(row)} className="mr-2 text-slate-600 dark:text-zinc-300">View</button>}{rowActions.map((item) => <button key={item.action} onClick={() => item.run(row, item.action)} className="mr-2 text-brand">{item.label}</button>)}{onEdit && <button onClick={() => onEdit(row)} className="mr-2 text-brand">Edit</button>}{onDelete && <button onClick={() => onDelete(row)} className="text-berry">Delete</button>}</td>}</tr>)}</tbody>
       </table>
+    </div>
+  )
+}
+
+function ConfirmDialog({ action, onClose }) {
+  if (!action) return null
+  async function confirm() {
+    await action.onConfirm()
+    onClose()
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="w-full max-w-md rounded-md border border-line bg-white p-5 shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold">{action.title}</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{action.message}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Cancel</button>
+          <button onClick={confirm} className="rounded-md bg-berry px-4 py-2 text-white">{action.confirmLabel}</button>
+        </div>
+      </div>
     </div>
   )
 }

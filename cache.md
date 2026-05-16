@@ -64,5 +64,8 @@
   - Live chat page connects to SignalR /hubs/chat, joins ticket channels, and sends ticket messages.
   - Sidebar navigation hides SuperAdmin-only Admins/Audit Log links for non-SuperAdmin users.
   - Settings security panel connects change password and enable 2FA endpoints.
+  - Sidebar collapsed state and theme preference persist in localStorage.
+  - CRUD-capable tables support checkbox selection and bulk delete with confirmation dialog.
+  - Vite build splits React, charts, query, realtime, and vendor chunks to avoid oversized bundle warnings.
   - Lint verified with npm run lint.
   - Build verified with npm run build.
