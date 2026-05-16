@@ -62,5 +62,7 @@
   - Products page supports CSV import and CSV export; Orders page supports CSV export.
   - Header notification bell connects to SignalR /hubs/notifications with unread badge and dropdown.
   - Live chat page connects to SignalR /hubs/chat, joins ticket channels, and sends ticket messages.
+  - Sidebar navigation hides SuperAdmin-only Admins/Audit Log links for non-SuperAdmin users.
+  - Settings security panel connects change password and enable 2FA endpoints.
   - Lint verified with npm run lint.
   - Build verified with npm run build.

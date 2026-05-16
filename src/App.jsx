@@ -144,9 +144,10 @@ function Shell() {
     return () => { connection.stop() }
   }, [])
   const unread = [...liveNotifications, ...(notifications.data || [])].filter((item) => !item.isRead).length
+  const filteredNav = nav.filter(([label]) => user?.role === 'SuperAdmin' || !['Admins', 'Audit Log'].includes(label))
   const sidebarLinks = (
     <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-3">
-      {nav.map(([label, to, Icon]) => (
+      {filteredNav.map(([label, to, Icon]) => (
         <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className={({ isActive }) => `mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm ${isActive ? 'bg-teal-50 text-brand dark:bg-teal-950' : 'text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800'}`}>
           <Icon size={18} /> {!collapsed && label}
         </NavLink>
@@ -649,6 +650,8 @@ function SettingsPage() {
   const general = useQuery({ queryKey: ['settings-general'], queryFn: () => api.get('/settings/general').then((r) => r.data.data) })
   const [storeForm, setStoreForm] = useState({ storeName: '', logoUrl: '', address: '', timeZone: 'Asia/Saigon' })
   const [generalForm, setGeneralForm] = useState({ taxRate: 0, currency: 'VND', language: 'vi' })
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' })
+  const [twoFa, setTwoFa] = useState(null)
   const activeStore = store.data || storeForm
   const activeGeneral = general.data || generalForm
   async function saveStore() {
@@ -677,6 +680,24 @@ function SettingsPage() {
       toast.error('Backup failed')
     }
   }
+  async function changePassword() {
+    try {
+      await api.post('/auth/change-password', passwordForm)
+      setPasswordForm({ currentPassword: '', newPassword: '' })
+      toast.success('Password changed')
+    } catch {
+      toast.error('Password change failed')
+    }
+  }
+  async function enable2fa() {
+    try {
+      const response = await api.post('/auth/enable-2fa')
+      setTwoFa(response.data.data)
+      toast.success('2FA enabled')
+    } catch {
+      toast.error('2FA enable failed')
+    }
+  }
   return (
     <section>
       <PageTitle title="Settings" action="System" />
@@ -696,6 +717,15 @@ function SettingsPage() {
             <button onClick={saveGeneral} className="rounded-md bg-brand px-4 py-2 text-white">Save General</button>
             <button onClick={backup} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Backup</button>
           </div>
+        </Panel>
+        <Panel title="Security">
+          <FormInput label="Current Password" type="password" value={passwordForm.currentPassword} onChange={(value) => setPasswordForm({ ...passwordForm, currentPassword: value })} />
+          <FormInput label="New Password" type="password" value={passwordForm.newPassword} onChange={(value) => setPasswordForm({ ...passwordForm, newPassword: value })} />
+          <div className="mt-4 flex gap-2">
+            <button onClick={changePassword} className="rounded-md bg-brand px-4 py-2 text-white">Change Password</button>
+            <button onClick={enable2fa} className="rounded-md border border-line px-4 py-2 dark:border-zinc-700">Enable 2FA</button>
+          </div>
+          {twoFa && <div className="mt-3 rounded-md bg-slate-100 p-3 font-mono text-xs dark:bg-zinc-800">{twoFa.manualEntryKey}</div>}
         </Panel>
       </div>
     </section>
